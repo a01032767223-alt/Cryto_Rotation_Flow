@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>코인 순환 레이더</title>
+<meta name="description" content="비트코인 → 이더리움·대형 → 중형 → 소형 알트코인으로 이어지는 자금 순환이 지금 어디쯤인지 보여주는 대시보드">
+<meta name="theme-color" content="#0b1020">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="순환 레이더">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+:root{
+  --bg:#0b1020; --card:#131a33; --card2:#18213f; --line:#26305a; --text:#e9edf9; --muted:#8d97bd; --dim:#5d6790;
+  --up:#ff4d5e; --dn:#3d8bff; --warn:#ffb020;
+  --t1:#f7931a; --t2:#8c8cf7; --t3:#26c6da; --t4:#ff4f8b;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--text)}
+body{font-family:"Pretendard Variable",Pretendard,-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+  font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+.wrap{max-width:560px;margin:0 auto;padding:14px 14px 40px}
+header{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+header img{width:38px;height:38px;border-radius:10px}
+header h1{font-size:19px;font-weight:800;letter-spacing:-.3px}
+header .sub{font-size:12px;color:var(--muted)}
+header .sp{flex:1}
+.btn{white-space:nowrap;background:var(--card2);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:8px 12px;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+.btn:active{transform:scale(.97)}
+.btn.spin span{display:inline-block;animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:12px}
+.card h2{font-size:15px;font-weight:800;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.card h2 .hint{font-size:11.5px;color:var(--muted);font-weight:500;margin-left:auto}
+.up{color:var(--up)} .dn{color:var(--dn)} .mut{color:var(--muted)}
+.status{font-size:12px;color:var(--muted);margin:-4px 0 10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;background:var(--card2);border:1px solid var(--line);font-size:11.5px;color:var(--muted)}
+.chip.ok{color:#5be3a0;border-color:#1f5a44}
+.chip.warn{color:var(--warn);border-color:#6b4a10}
+
+/* hero */
+.hero{position:relative;overflow:hidden}
+.hero .lab{font-size:12px;color:var(--muted);font-weight:600}
+.hero .stage{font-size:26px;font-weight:900;letter-spacing:-.6px;margin:2px 0 4px}
+.hero .pos{font-size:13px;color:var(--muted)}
+.hero .pos b{color:var(--text);font-size:15px}
+.hero .sum{margin-top:10px;font-size:14px;line-height:1.65}
+.hero .sum p{margin-bottom:6px}
+.hero .alert{margin-top:8px;padding:9px 11px;border-radius:10px;font-size:13px;background:rgba(255,77,94,.12);border:1px solid rgba(255,77,94,.35)}
+.hero .note{margin-top:8px;padding:9px 11px;border-radius:10px;font-size:13px;background:rgba(61,139,255,.10);border:1px solid rgba(61,139,255,.3)}
+.posbar{position:relative;height:10px;border-radius:6px;margin:12px 0 4px;background:linear-gradient(90deg,var(--t1),var(--t2),var(--t3),var(--t4))}
+.posbar .knob{position:absolute;top:50%;width:20px;height:20px;margin:-10px 0 0 -10px;border-radius:50%;background:#fff;border:4px solid var(--bg);box-shadow:0 0 0 2px #fff,0 0 14px rgba(255,255,255,.6);transition:left .8s}
+.poslab{display:flex;justify-content:space-between;font-size:10.5px;color:var(--muted)}
+
+/* ladder */
+.ladder{position:relative;padding-left:30px}
+.rail{position:absolute;left:10px;top:24px;bottom:24px;width:4px;border-radius:2px;background:linear-gradient(180deg,var(--t1),var(--t2),var(--t3),var(--t4));opacity:.5}
+.here{position:absolute;left:-1px;width:26px;height:26px;margin-top:-13px;border-radius:50%;background:#fff;color:#0b1020;font-size:10px;font-weight:900;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 4px rgba(255,255,255,.18),0 0 18px rgba(255,255,255,.55);transition:top .8s;z-index:2}
+.here::after{content:"지금";}
+.tier{background:var(--card2);border:1px solid var(--line);border-left:4px solid var(--tc);border-radius:12px;padding:10px 11px;position:relative}
+.tier.lead{box-shadow:0 0 0 1px var(--tc),0 0 22px -4px var(--tc)}
+.tier .top{display:flex;align-items:baseline;gap:6px}
+.tier .nm{font-weight:800;font-size:14.5px}
+.tier .rg{font-size:11px;color:var(--muted)}
+.tier .badge{margin-left:auto;font-size:10.5px;font-weight:800;padding:2px 7px;border-radius:999px;background:var(--tc);color:#0b1020}
+.tier .row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:8px}
+.tier .m{background:rgba(255,255,255,.03);border-radius:8px;padding:5px 6px}
+.tier .m .k{font-size:10.5px;color:var(--muted)}
+.tier .m .v{font-size:14px;font-weight:800;font-variant-numeric:tabular-nums}
+.tier .bot{display:flex;align-items:center;gap:8px;margin-top:8px}
+.tier .movers{display:flex;gap:4px;flex-wrap:wrap;flex:1}
+.tier .mv{font-size:11px;padding:1px 6px;border-radius:6px;background:rgba(255,255,255,.05);font-variant-numeric:tabular-nums}
+.tier svg.spk{width:96px;height:30px;flex:none}
+.tier .mvl{font-size:10.5px;color:var(--muted);align-self:center;margin-right:2px}
+.reps{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line)}
+.reps .rh2{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:5px}
+.reps .rgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
+.reps .rc{background:rgba(255,255,255,.04);border-radius:7px;padding:4px 2px;text-align:center}
+.reps .rc.moved{outline:1px dashed #6b76a6}
+.reps .rs{font-size:11px;font-weight:800}
+.reps .rv{font-size:11.5px;font-weight:800;font-variant-numeric:tabular-nums}
+table.rt{width:100%;border-collapse:separate;border-spacing:0 3px;font-size:12.5px;font-variant-numeric:tabular-nums}
+.rt th{font-size:11px;color:var(--muted);font-weight:700;text-align:right;padding:2px 4px}
+.rt th:first-child{text-align:left}
+.rt td{text-align:right;padding:5px 4px;font-weight:800;border-radius:6px}
+.rt td.cn{text-align:left;font-weight:500}
+.rt .use{font-size:10.5px;color:var(--muted)}
+.rt tr.grp td{text-align:left;font-size:12.5px;font-weight:800;padding-top:10px}
+.rt .tagm{white-space:nowrap;font-size:10px;margin-left:4px;padding:0 5px;border-radius:5px;background:#3a2f12;color:var(--warn)}
+.memo{display:flex;gap:8px;padding:9px 10px;border-radius:10px;margin-bottom:6px;font-size:13.5px;line-height:1.6}
+.memo .mi{flex:none}
+.dd{margin-bottom:12px}
+.ddh{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;color:var(--muted)}
+.ddh b{color:var(--text);font-size:14px}
+.ddbar{position:relative;height:12px;border-radius:6px;background:#232c52;margin:22px 0 6px}
+.ddfill{position:absolute;left:0;top:0;bottom:0;border-radius:6px;background:linear-gradient(90deg,#5d6790,#3d8bff)}
+.ddt{position:absolute;top:-4px;bottom:-4px;width:2px;background:#ffb020;margin-left:-1px}
+.ddt span{position:absolute;top:-17px;left:50%;transform:translateX(-50%);font-size:10px;color:#ffb020;white-space:nowrap}
+.ddk{position:absolute;top:50%;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;background:#fff;border:3px solid var(--bg);box-shadow:0 0 0 2px #fff}
+.ddv{display:flex;justify-content:space-between;align-items:center;font-weight:900;font-size:17px}
+.ddst{font-size:12px;font-weight:800;padding:2px 8px;border-radius:999px;background:#232c52}
+.ddst.st1,.ddst.st2{background:#1d3a6e;color:#9cc3ff}.ddst.st3,.ddst.st4{background:#2f6fe0;color:#fff}
+.share{display:flex;height:12px;border-radius:6px;overflow:hidden;margin-top:10px;background:#232c52}
+.futop{display:flex;gap:8px;align-items:flex-start}
+.flow{display:flex;align-items:center;gap:8px;height:38px;padding-left:6px;font-size:12px}
+.flow .arr{width:22px;height:34px;flex:none}
+.flow .t{color:var(--muted)}
+.flow .t b{font-weight:800}
+@keyframes dash{to{stroke-dashoffset:-16}}
+@keyframes dashUp{to{stroke-dashoffset:16}}
+.flow .arr .ln{stroke-dasharray:4 4;animation:dash .9s linear infinite}
+.flow.upw .arr .ln{animation:dashUp .9s linear infinite}
+.flow.still .arr .ln{animation:none}
+
+/* gauges */
+.gauges{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.g{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:8px 6px 8px;text-align:center}
+.g .gt{font-size:11.5px;color:var(--muted);font-weight:700}
+.g svg{width:100%;height:auto;display:block}
+.g .gv{font-size:20px;font-weight:900;margin-top:-6px;font-variant-numeric:tabular-nums}
+.g .gs{font-size:11px;color:var(--muted)}
+
+/* kpi */
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.kpi{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:9px 10px}
+.kpi .k{font-size:11.5px;color:var(--muted);font-weight:700}
+.kpi .v{font-size:19px;font-weight:900;font-variant-numeric:tabular-nums;letter-spacing:-.3px}
+.kpi .d{font-size:11.5px;font-variant-numeric:tabular-nums}
+.kpi svg{width:100%;height:28px;display:block;margin-top:4px}
+
+/* charts */
+.chart svg{width:100%;height:auto;display:block}
+.legend{display:flex;gap:10px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin-top:6px}
+.legend i{display:inline-block;width:10px;height:3px;border-radius:2px;margin-right:4px;vertical-align:middle}
+.cap{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.55}
+
+/* heat table */
+table.ht{width:100%;border-collapse:separate;border-spacing:3px;font-size:12.5px;font-variant-numeric:tabular-nums}
+.ht th{font-size:11px;color:var(--muted);font-weight:700;padding:3px}
+.ht td{text-align:center;padding:7px 2px;border-radius:7px;font-weight:800}
+.ht td.rh{text-align:left;color:var(--muted);font-weight:700;background:none}
+
+/* history */
+.hist-list{margin-top:8px;font-size:12.5px}
+.hist-list div{display:flex;justify-content:space-between;padding:5px 2px;border-bottom:1px dashed var(--line)}
+.hist-list div:last-child{border-bottom:0}
+
+details{margin-top:4px}
+details summary{cursor:pointer;font-weight:800;font-size:14px;list-style:none}
+details summary::-webkit-details-marker{display:none}
+details summary::after{content:" ▾";color:var(--muted)}
+details[open] summary::after{content:" ▴"}
+.guide{font-size:13px;line-height:1.7;margin-top:8px;color:#cfd5ec}
+.guide b{color:var(--text)}
+.guide .cy{background:var(--card2);border-radius:10px;padding:9px 11px;margin:6px 0;border:1px solid var(--line)}
+.foot{font-size:11.5px;color:var(--dim);line-height:1.7;text-align:center;margin-top:16px}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(120px);background:#222c52;border:1px solid var(--line);color:var(--text);padding:9px 14px;border-radius:12px;font-size:13px;transition:transform .3s,opacity .3s;opacity:0;z-index:9;max-width:90vw}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+.skel{color:var(--muted);text-align:center;padding:30px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <img src="icon-192.png" alt="">
+    <div>
+      <h1>코인 순환 레이더</h1>
+      <div class="sub">BTC → ETH·대형 → 중형 → 소형, 돈이 지금 어디에?</div>
+    </div>
+    <div class="sp"></div>
+    <button class="btn" id="refresh"><span>⟳</span> 갱신</button>
+  </header>
+  <div class="status" id="status"><span class="chip">불러오는 중…</span></div>
+
+  <div id="app"><div class="card skel">데이터를 불러오는 중입니다…</div></div>
+
+  <div class="card">
+    <details>
+      <summary>📖 읽는 법 · 용어 풀이 · 과거 사이클</summary>
+      <div class="guide">
+        <p><b>계층 나누기</b> — 시가총액(코인 전체 가치) 순위로 4개 계층을 나눕니다. 스테이블코인(달러에 가치를 고정한 코인)과 랩드·스테이킹 토큰(다른 코인을 감싸거나 맡겨서 만든 복제 코인)은 뺍니다.<br>
+        ① 비트코인 ② 이더리움+대형(2~10위) ③ 중형(11~50위) ④ 소형(51~200위)</p>
+        <p><b>단계별 대표 코인</b> — ② ETH·BNB·XRP·SOL·DOGE ③ ADA·LINK·SUI·AVAX·ONDO ④ RENDER·ENA·FIL·APT·INJ. 2026년 11월 시가총액 순위로 고른 관찰용 목록입니다. 순위가 바뀌면 화면에 ‘지금 n단계’로 표시됩니다.</p>
+        <p><b>BTC 대비 초과수익</b> — 그 계층이 같은 기간 비트코인보다 몇 %p(퍼센트포인트, 퍼센트끼리의 차이) 더 올랐는지입니다. 빨강▲이면 비트코인보다 강하고, 파랑▼이면 약합니다.</p>
+        <p><b>현재 위치(1~4)</b> — 계층별 초과수익(24시간 20%, 7일 50%, 30일 30% 비중)을 합쳐, 돈이 가장 강하게 몰리는 계층 쪽으로 위치를 계산합니다. 1에 가까우면 비트코인 쏠림, 4에 가까우면 소형 알트 과열입니다.</p>
+        <p><b>흐름 화살표</b> — 아래 계층이 위 계층보다 강하면 ↓(빨강, 더 위험한 쪽으로 이동), 약하면 ↑(파랑, 안전한 쪽으로 후퇴)입니다.</p>
+        <p><b>도미넌스</b> — 전체 코인 시가총액 중 비트코인(또는 이더리움)이 차지하는 비중입니다. 지난 7일·30일 변화는 상위 250개 코인 데이터로 추정한 값입니다.</p>
+        <p><b>알트시즌 지수(자체 계산)</b> — 상위 100개 알트코인 중 최근 30일 동안 비트코인보다 많이 오른 코인의 비율입니다. 75 이상이면 알트시즌, 25 이하면 비트코인 시즌입니다. (CoinMarketCap 공식 지수는 90일 기준이라 숫자가 다를 수 있습니다.)</p>
+        <p><b>순환 온도</b> — 알트시즌 지수, 도미넌스 변화, ETH/BTC 변화, 소형 알트 강도, 공포·탐욕 지수를 섞은 0~100 점수입니다. 75 이상(빨간 구간)은 과열입니다.</p>
+        <p><b>김치 프리미엄</b> — 업비트 가격이 해외 가격(원화 환산)보다 몇 % 비싼지입니다. 5% 이상이면 국내 과열, 0% 아래(역프리미엄)면 국내 공포입니다. <b>알트 쏠림 배수</b>는 업비트 알트코인 거래대금이 비트코인의 몇 배인지입니다.</p>
+        <p><b>펀딩비·미결제약정</b> — 펀딩비는 선물 매수·매도 쪽이 8시간마다 주고받는 이자로, 높으면 빚내서 산 매수가 과열된 것입니다. 미결제약정은 아직 정리되지 않은 선물 계약 총액으로, 빠르게 늘면 레버리지가 쌓이는 것입니다.</p>
+        <p><b>대기 자금</b> — 스테이블코인 총액입니다. 늘면 코인을 사려는 새 돈이 들어오는 것입니다.</p>
+        <p><b>5단계 매수 기준</b> — 사상 최고가 대비 −15%·−25%·−35%·−45%에 기준선을 두고 나눠 사는 방식입니다.</p>
+        <p><b>과거 사이클 비교</b></p>
+        <div class="cy"><b>2017~2018</b> · 비트코인이 먼저 올랐고, 도미넌스는 약 87%에서 30%대까지 떨어졌습니다. 이더리움과 ICO(새 코인을 팔아 자금을 모으는 방식) 코인이 2018년 1월에 고점을 찍은 뒤 함께 폭락했습니다. → 순환 완성</div>
+        <div class="cy"><b>2021</b> · 비트코인 4월 고점 → 이더리움·도지코인 5월 고점. 도미넌스는 약 70%에서 40%대까지 내려갔습니다. → 순환 완성</div>
+        <div class="cy"><b>2024~2026</b> · 비트코인은 2025년 말 사상 최고가를 기록했지만 도미넌스가 55~62%로 높게 유지됐습니다. 알트시즌 지수는 2026년 중반 30 근처에 머물렀습니다. → 순환이 비트코인·이더리움에서 멈춤</div>
+        <p class="mut" style="margin-top:6px">순환은 법칙이 아니라 과거에 두세 번 나타난 경향입니다. 이 앱은 참고용이며 투자 권유가 아닙니다.</p>
+      </div>
+    </details>
+  </div>
+
+  <div class="foot">데이터: CoinGecko(시세·시가총액·도미넌스·최고가), Binance(ETH/BTC·선물), 업비트, DefiLlama(스테이블코인), alternative.me(공포·탐욕), open.er-api(환율)<br>무료 API라서 잦은 갱신은 잠시 막힐 수 있습니다. 막히면 마지막 저장 데이터를 보여줍니다.</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+/* ───────── 설정 ───────── */
+const API = {
+  markets: 'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=1&sparkline=true&price_change_percentage=24h%2C7d%2C30d',
+  global: 'https://api.coingecko.com/api/v3/global',
+  fng: 'https://api.alternative.me/fng/?limit=30',
+  ethbtc: [
+    'https://data-api.binance.vision/api/v3/klines?symbol=ETHBTC&interval=1d&limit=400',
+    'https://api.binance.com/api/v3/klines?symbol=ETHBTC&interval=1d&limit=400'
+  ],
+  ethbtcCG: 'https://api.coingecko.com/api/v3/coins/ethereum/market_chart?vs_currency=btc&days=365&interval=daily'
+};
+const TIERS = [
+  {k:1, name:'비트코인', short:'BTC', range:'안전성·거대 자금', color:'var(--t1)', hex:'#f7931a'},
+  {k:2, name:'이더리움·대형 알트', short:'ETH·대형', range:'2~10위', color:'var(--t2)', hex:'#8c8cf7'},
+  {k:3, name:'중형 알트', short:'중형', range:'11~50위', color:'var(--t3)', hex:'#26c6da'},
+  {k:4, name:'소형 알트', short:'소형', range:'51~200위', color:'var(--t4)', hex:'#ff4f8b'}
+];
+const STAGE_TXT = {
+  1:{t:'비트코인 주도', d:'자금이 비트코인에 머물러 있습니다. 알트코인은 비트코인보다 약합니다.'},
+  2:{t:'이더리움·대형 알트로 이동', d:'비트코인에서 이더리움과 대형 알트로 돈이 옮겨 가기 시작했습니다.'},
+  3:{t:'중형 알트 테마 순환', d:'더 빠른 수익을 좇아 중형 알트의 테마별 상승이 나타나고 있습니다.'},
+  4:{t:'소형 알트 과열', d:'가벼운 소형 알트가 가장 강합니다. 과거에는 순환의 마지막 단계였습니다.'}
+};
+const W = {r24:0.2, r7:0.5, r30:0.3};
+// 단계별 대표 코인 5종 (심볼, 한글 이름, 쓰임새)
+const REPS = {
+  2:[['eth','이더리움','스마트계약 플랫폼'],['bnb','바이낸스코인','바이낸스 생태계'],['xrp','리플','국제 송금'],['sol','솔라나','고속 체인'],['doge','도지코인','대표 밈코인']],
+  3:[['ada','카르다노','플랫폼'],['link','체인링크','오라클(외부 데이터 공급)'],['sui','수이','신흥 고속 체인'],['avax','아발란체','플랫폼'],['ondo','온도','실물자산 토큰(RWA)']],
+  4:[['render','렌더','AI·그래픽 연산'],['ena','에테나','달러 연동 수익'],['fil','파일코인','분산 저장소'],['apt','앱토스','고속 체인'],['inj','인젝티브','탈중앙 거래소 체인']]
+};
+const SPK_N = 42;
+const LS_CACHE = 'crf_cache_v1', LS_HIST = 'crf_hist_v1';
+
+const EXCL = new Set(('usdt usdc dai usde fdusd tusd usdd pyusd usds usd1 rlusd frax gusd lusd busd usdp eurc susde susds usdtb usdx bfusd usdf usdg usd0 gho crvusd usdt0 usdai frxusd dola eusd mim usdb yusd avusd reusd stusd usdy usdm usdo ustb buidl ousg usyc syrupusdc syrupusdt '+
+  'xaut paxg kau kag '+
+  'wbtc weth steth wsteth weeth cbbtc reth cbeth meth ezeth rseth lbtc solvbtc xsolvbtc wbeth bnsol jitosol msol jupsol bbsol tbtc clbtc fbtc ebtc unibtc btc.b kbtc enzobtc sbtc oseth sweth pufeth rsweth sfrxeth frxeth lseth ankreth hbtc renbtc stkaave wbnb wsol whype khype sthype wtrx stx_ btcb').split(/\s+/));
+const NAME_RX = /wrapped|staked|bridged|restaked|liquid stak|stablecoin|usd coin|tether|treasury|\bgold\b|binance-peg/i;
+
+/* ───────── 유틸 ───────── */
+const $ = s => document.querySelector(s);
+const num = v => (typeof v === 'number' && isFinite(v)) ? v : null;
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+const sgn = v => v > 0 ? '▲' : v < 0 ? '▼' : '';
+const cls = v => v > 0.0001 ? 'up' : v < -0.0001 ? 'dn' : 'mut';
+const fP = (v,d=1) => v==null||!isFinite(v) ? '–' : sgn(v)+Math.abs(v).toFixed(d)+'%';
+const fPP = (v,d=1) => v==null||!isFinite(v) ? '–' : sgn(v)+Math.abs(v).toFixed(d)+'%p';
+const fUsd = v => v==null ? '–' : v >= 1000 ? '$'+Math.round(v).toLocaleString('en-US') : '$'+v.toPrecision(4);
+const kst = t => new Date(t).toLocaleString('ko-KR',{timeZone:'Asia/Seoul',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false});
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function lsGet(k){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; }catch(e){ return null; } }
+function lsSet(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('show'),3200); }
+async function getJSON(url, ms=15000){
+  const ac = new AbortController(); const tm = setTimeout(()=>ac.abort(), ms);
+  try{ const r = await fetch(url,{signal:ac.signal, cache:'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status); return await r.json(); }
+  finally{ clearTimeout(tm); }
+}
+function trimmedMean(arr, frac=0.1){
+  const a = arr.filter(v => v!=null && isFinite(v)).sort((x,y)=>x-y);
+  if(!a.length) return null;
+  const k = Math.floor(a.length*frac); const b = a.slice(k, a.length-k || undefined);
+  const s = b.length ? b : a; return s.reduce((p,c)=>p+c,0)/s.length;
+}
+function resample(arr, n){
+  if(!Array.isArray(arr) || arr.length < 4) return null;
+  const L = arr.length, out = [];
+  for(let j=0;j<n;j++){
+    let i = Math.round(j*(L-1)/(n-1)), v = arr[i], s = 1;
+    while((v==null||!isFinite(v)) && s < L){ v = arr[i-s] ?? arr[i+s]; s++; }
+    out.push(v==null ? null : +v);
+  }
+  return out;
+}
+
+/* ───────── 데이터 수집 ───────── */
+function compactMarkets(list){
+  return list.map(c => ({
+    id:c.id, s:(c.symbol||'').toLowerCase(), n:c.name||'', p:num(c.current_price), mc:num(c.market_cap),
+    r24:num(c.price_change_percentage_24h_in_currency ?? c.price_change_percentage_24h),
+    r7:num(c.price_change_percentage_7d_in_currency), r30:num(c.price_change_percentage_30d_in_currency),
+    ath:num(c.ath), athc:num(c.ath_change_percentage), athd:c.ath_date||null,
+    sp: resample(c.sparkline_in_7d && c.sparkline_in_7d.price, SPK_N)
+  })).filter(c => c.mc && c.mc > 0);
+}
+async function fetchEthBtc(){
+  for(const u of API.ethbtc){
+    try{ const k = await getJSON(u, 10000); if(Array.isArray(k) && k.length > 30) return k.map(r => ({t:+r[0], v:+r[4]})); }catch(e){}
+  }
+  try{ const j = await getJSON(API.ethbtcCG); if(j && j.prices) return j.prices.map(r => ({t:r[0], v:r[1]})); }catch(e){}
+  return null;
+}
+async function loadAll(){
+  const [m, g, f, e] = await Promise.allSettled([getJSON(API.markets), getJSON(API.global), getJSON(API.fng), fetchEthBtc()]);
+  const cache = lsGet(LS_CACHE) || {};
+  const out = {live:{}, t: Date.now()};
+  if(m.status==='fulfilled' && Array.isArray(m.value) && m.value.length > 50){ out.markets = compactMarkets(m.value); out.live.markets = true; }
+  else if(cache.markets){ out.markets = cache.markets; out.t = cache.t; }
+  if(g.status==='fulfilled' && g.value && g.value.data){
+    const d = g.value.data; out.global = {btcD:num(d.market_cap_percentage.btc), ethD:num(d.market_cap_percentage.eth), tot:num(d.total_market_cap.usd), ch24:num(d.market_cap_change_percentage_24h_usd)}; out.live.global = true;
+  } else if(cache.global) out.global = cache.global;
+  if(f.status==='fulfilled' && f.value && f.value.data){
+    out.fng = f.value.data.map(x => ({v:+x.value, c:x.value_classification, t:+x.timestamp*1000})).reverse(); out.live.fng = true;
+  } else if(cache.fng) out.fng = cache.fng;
+  if(e.status==='fulfilled' && e.value){ out.ethbtc = e.value.slice(-400); out.live.ethbtc = true; }
+  else if(cache.ethbtc) out.ethbtc = cache.ethbtc;
+  if(!out.markets) throw new Error('시세 데이터를 불러오지 못했습니다');
+  if(out.live.markets) lsSet(LS_CACHE, {t:out.t, markets:out.markets, global:out.global, fng:out.fng, ethbtc:out.ethbtc});
+  return out;
+}
+
+/* ───────── 분석 ───────── */
+function isExcluded(c){
+  if(EXCL.has(c.s)) return true;
+  if(NAME_RX.test(c.n)) return true;
+  if(c.r7!=null && c.r30!=null && Math.abs(c.r7) < 0.6 && Math.abs(c.r30) < 1.2) return true; // 가격 고정형
+  if(c.p!=null && c.p > 0.97 && c.p < 1.03 && c.r30!=null && Math.abs(c.r30) < 3) return true;
+  return false;
+}
+function analyze(D){
+  const all = D.markets.slice().sort((a,b)=>b.mc-a.mc);
+  const btc = all.find(c => c.id==='bitcoin');
+  if(!btc) throw new Error('비트코인 데이터 없음');
+  const alts = all.filter(c => c.id!=='bitcoin' && !isExcluded(c));
+  const groups = {1:[btc], 2:alts.slice(0,9), 3:alts.slice(9,49), 4:alts.slice(49,199)};
+  const eth = all.find(c => c.id==='ethereum');
+
+  // 계층별 수익률
+  const P = ['r24','r7','r30'];
+  const tiers = {};
+  for(const k of [1,2,3,4]){
+    const arr = groups[k]; const t = {k, n:arr.length, ret:{}, ex:{}, breadth:{}};
+    for(const p of P){
+      t.ret[p] = k===1 ? btc[p] : trimmedMean(arr.map(c=>c[p]));
+      t.ex[p] = (t.ret[p]!=null && btc[p]!=null) ? t.ret[p]-btc[p] : null;
+      if(k>1){ const v = arr.filter(c=>c[p]!=null); t.breadth[p] = v.length ? v.filter(c=>c[p]>btc[p]).length/v.length*100 : null; }
+    }
+    t.rs = k===1 ? 0 : P.reduce((s,p)=> s + W[p]*(t.ex[p]??0), 0);
+    t.movers = k===1 ? [] : arr.filter(c=>c.r7!=null).sort((a,b)=>b.r7-a.r7).slice(0,3);
+    // 7일 BTC 대비 상대 흐름선
+    if(btc.sp && btc.sp[0]){
+      const b0 = btc.sp[0]; const bn = btc.sp.map(v=>v/b0);
+      if(k===1){ t.rel = bn.map(()=>0); t.abs = bn.map(v=>(v-1)*100); }
+      else{
+        const ns = arr.filter(c=>c.sp && c.sp[0]>0 && c.sp.every(v=>v!=null)).map(c=>c.sp.map(v=>v/c.sp[0]));
+        if(ns.length){ t.rel = bn.map((bv,j)=> (trimmedMean(ns.map(s=>s[j]))/bv - 1)*100); }
+      }
+    }
+    tiers[k] = t;
+  }
+
+  // 위치 계산
+  const avgAlt = (tiers[2].rs + tiers[3].rs + tiers[4].rs)/3;
+  const w = {1: 2 + Math.max(0, -avgAlt), 2: Math.max(0,tiers[2].rs), 3: Math.max(0,tiers[3].rs), 4: Math.max(0,tiers[4].rs)};
+  const ws = w[1]+w[2]+w[3]+w[4];
+  const pos = (1*w[1]+2*w[2]+3*w[3]+4*w[4])/ws;
+  const stage = clamp(Math.round(pos),1,4);
+  let lead = 1; for(const k of [2,3,4]) if(tiers[k].rs > tiers[lead].rs) lead = k;
+
+  // 흐름(위→아래)
+  const flows = [1,2,3].map(k => {
+    const f = tiers[k+1].rs - tiers[k].rs;
+    const a = Math.abs(f);
+    return {from:k, to:k+1, f, lvl: a < 1.5 ? 0 : a < 5 ? 1 : 2};
+  });
+
+  // 도미넌스 추정 (상위 250 전체로 비율 변화 추정)
+  const G = D.global || {};
+  const sumMc = all.reduce((s,c)=>s+c.mc,0);
+  const then = p => all.reduce((s,c)=> s + c.mc/(1+((c[p]??0)/100)), 0);
+  const domAt = (p, coin, nowD) => {
+    if(nowD==null || !coin || coin[p]==null) return null;
+    const fNow = coin.mc/sumMc, fThen = (coin.mc/(1+coin[p]/100))/then(p);
+    return nowD * fThen / fNow;
+  };
+  const btcD = G.btcD ?? btc.mc/sumMc*100*0.97;
+  const ethD = G.ethD ?? (eth ? eth.mc/sumMc*100*0.97 : null);
+  const dom = {
+    btc: btcD, eth: ethD,
+    btc7: domAt('r7', btc, btcD), btc30: domAt('r30', btc, btcD), btc24: domAt('r24', btc, btcD),
+    eth7: domAt('r7', eth, ethD), eth30: domAt('r30', eth, ethD)
+  };
+  dom.dBtc7 = dom.btc7!=null ? btcD - dom.btc7 : null;
+  dom.dBtc30 = dom.btc30!=null ? btcD - dom.btc30 : null;
+  dom.dBtc24 = dom.btc24!=null ? btcD - dom.btc24 : null;
+  dom.dEth7 = dom.eth7!=null ? ethD - dom.eth7 : null;
+  dom.dEth30 = dom.eth30!=null ? ethD - dom.eth30 : null;
+  const tot30 = (sumMc/then('r30')-1)*100, tot7 = (sumMc/then('r7')-1)*100;
+  const regime = tot30 > 10 ? {t:'상승장', c:'up'} : tot30 < -10 ? {t:'하락장', c:'dn'} : {t:'횡보장', c:'mut'};
+
+  // ETH/BTC
+  const ebNow = (eth && btc.p) ? eth.p/btc.p : null;
+  let eb = null;
+  if(D.ethbtc && D.ethbtc.length > 40){
+    const s = D.ethbtc.slice(); if(ebNow) s[s.length-1] = {t:s[s.length-1].t, v:ebNow};
+    const v = s.map(x=>x.v); const n = v.length;
+    const ma = v.map((_,i)=> i>=199 ? v.slice(i-199,i+1).reduce((a,b)=>a+b,0)/200 : null);
+    eb = {series:s.slice(-365), ma:ma.slice(-365), now:v[n-1], ch30:(v[n-1]/v[Math.max(0,n-31)]-1)*100, ch90:(v[n-1]/v[Math.max(0,n-91)]-1)*100, ma200:ma[n-1]};
+  } else if(ebNow && eth && eth.r30!=null){
+    eb = {series:null, now:ebNow, ch30:((1+eth.r30/100)/(1+btc.r30/100)-1)*100};
+  }
+
+  // 알트시즌 지수(자체)
+  const top100 = alts.slice(0,99);
+  const altIdx = (p) => { const v = top100.filter(c=>c[p]!=null && btc[p]!=null); return v.length ? Math.round(v.filter(c=>c[p]>btc[p]).length/v.length*100) : null; };
+  const alt30 = altIdx('r30'), alt7 = altIdx('r7');
+
+  // 공포탐욕
+  const fng = D.fng && D.fng.length ? D.fng[D.fng.length-1] : null;
+
+  // 순환 온도
+  const parts = [];
+  if(alt30!=null) parts.push([0.30, alt30]);
+  if(dom.dBtc30!=null) parts.push([0.20, clamp(50 - dom.dBtc30*10, 0, 100)]);
+  if(eb && eb.ch30!=null) parts.push([0.15, clamp(50 + eb.ch30*2.5, 0, 100)]);
+  parts.push([0.20, clamp(50 + tiers[4].rs*2.5, 0, 100)]);
+  if(fng) parts.push([0.15, fng.v]);
+  const ws2 = parts.reduce((s,p)=>s+p[0],0);
+  const heat = Math.round(parts.reduce((s,p)=>s+p[0]*p[1],0)/ws2);
+
+  // 대표 코인
+  const ranked = [btc, ...alts];
+  const rankOf = new Map(ranked.map((c,i)=>[c.id, i+1]));
+  const tierOfRank = r => r==null ? null : r===1 ? 1 : r<=10 ? 2 : r<=50 ? 3 : r<=200 ? 4 : 5;
+  const reps = {};
+  for(const k of [2,3,4]){
+    const list = REPS[k].map(([sym, kn, use]) => {
+      const c = all.find(x => x.s===sym); // 같은 심볼이면 시가총액 큰 것
+      const r = c ? rankOf.get(c.id) : null;
+      return {sym, kn, use, c, rank:r, tierNow:tierOfRank(r), ex7: c&&c.r7!=null&&btc.r7!=null ? c.r7-btc.r7 : null, ex30: c&&c.r30!=null&&btc.r30!=null ? c.r30-btc.r30 : null};
+    });
+    const v7 = list.map(x=>x.ex7).filter(v=>v!=null), v30 = list.map(x=>x.ex30).filter(v=>v!=null);
+    reps[k] = {list, avg7: v7.length ? v7.reduce((a,b)=>a+b,0)/v7.length : null, avg30: v30.length ? v30.reduce((a,b)=>a+b,0)/v30.length : null};
+  }
+  return {btc, eth, tiers, pos, stage, lead, flows, dom, regime, tot30, tot7, eb, alt30, alt7, fng, heat, G, reps};
+}
+
+/* ───────── 그리기 도구 ───────── */
+function sparkSVG(vals, color, w=96, h=30, zero=true){
+  const v = (vals||[]).filter(x=>x!=null&&isFinite(x)); if(v.length<2) return '';
+  let mn = Math.min(...v), mx = Math.max(...v); if(zero){ mn=Math.min(mn,0); mx=Math.max(mx,0); } if(mx-mn<1e-9){mx+=1;mn-=1;}
+  const X = i => 2 + i*(w-4)/(vals.length-1), Y = x => 3 + (mx-x)*(h-6)/(mx-mn);
+  const d = vals.map((x,i)=> (i?'L':'M')+X(i).toFixed(1)+' '+Y(x).toFixed(1)).join('');
+  const last = vals[vals.length-1];
+  const z = zero ? `<line x1="2" x2="${w-2}" y1="${Y(0)}" y2="${Y(0)}" stroke="#3a4575" stroke-dasharray="2 3"/>` : '';
+  return `<svg class="spk" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">${z}<path d="${d}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linejoin="round"/><circle cx="${X(vals.length-1)}" cy="${Y(last)}" r="2.6" fill="${color}"/></svg>`;
+}
+function gaugeSVG(val, zones, danger=[75,100]){
+  // 반원 게이지: 0~100
+  const cx=60, cy=60, r=46, sw=10;
+  const pt = (v,rr=r) => { const a = Math.PI*(1 - v/100); return [cx + rr*Math.cos(a), cy - rr*Math.sin(a)]; };
+  const arc = (a,b,col,wd=sw,rr=r) => { const [x1,y1]=pt(a,rr), [x2,y2]=pt(b,rr); return `<path d="M${x1.toFixed(2)} ${y1.toFixed(2)} A${rr} ${rr} 0 0 1 ${x2.toFixed(2)} ${y2.toFixed(2)}" stroke="${col}" stroke-width="${wd}" fill="none"/>`; };
+  let s = arc(0,100,'#232c52');
+  zones.forEach(z => s += arc(z[0], z[1], z[2]));
+  s += arc(danger[0], danger[1], '#ff3b4f', 4, r+9);
+  [0,25,50,75,100].forEach(t => { const [x1,y1]=pt(t,r-8), [x2,y2]=pt(t,r-12); s += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#6b76a6" stroke-width="1.2"/>`; });
+  if(val!=null){
+    const v = clamp(val,0,100); const [nx,ny] = pt(v, r-4);
+    s += `<g class="needle"><line x1="${cx}" y1="${cy}" x2="${nx.toFixed(2)}" y2="${ny.toFixed(2)}" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/></g><circle cx="${cx}" cy="${cy}" r="5" fill="#fff"/><circle cx="${cx}" cy="${cy}" r="2" fill="#0b1020"/>`;
+  }
+  return `<svg viewBox="0 0 120 70">${s}</svg>`;
+}
+function lineChart({series, height=190, yFmt=v=>v.toFixed(1), xLabels=[], zero=false, yMinPad=0.08, ylabRight=true}){
+  const Wd = 340, H = height, L = 6, R = 44, T = 10, B = 20;
+  const all = []; series.forEach(s => s.data.forEach(v => { if(v!=null && isFinite(v)) all.push(v); }));
+  if(!all.length) return '<div class="skel">데이터 없음</div>';
+  let mn = Math.min(...all), mx = Math.max(...all); if(zero){ mn=Math.min(mn,0); mx=Math.max(mx,0); }
+  const pad = (mx-mn)*yMinPad || Math.abs(mx)*0.05 || 1; mn-=pad; mx+=pad;
+  const n = Math.max(...series.map(s=>s.data.length));
+  const X = i => L + i*(Wd-L-R)/(n-1), Y = v => T + (mx-v)*(H-T-B)/(mx-mn);
+  let g = '';
+  for(let i=0;i<=4;i++){ const v = mn + (mx-mn)*i/4, y = Y(v); g += `<line x1="${L}" x2="${Wd-R}" y1="${y}" y2="${y}" stroke="#1f2850"/><text x="${Wd-R+4}" y="${y+3.5}" fill="#6b76a6" font-size="9.5">${yFmt(v)}</text>`; }
+  if(zero && mn<0 && mx>0) g += `<line x1="${L}" x2="${Wd-R}" y1="${Y(0)}" y2="${Y(0)}" stroke="${series[0].zeroColor||'#f7931a'}" stroke-width="1.3" stroke-dasharray="4 3" opacity=".8"/>`;
+  xLabels.forEach(([i,t]) => { g += `<text x="${clamp(X(i),L+12,Wd-R-12)}" y="${H-5}" fill="#6b76a6" font-size="9.5" text-anchor="middle">${t}</text>`; });
+  series.forEach(s => {
+    let d='', pen=false;
+    s.data.forEach((v,i)=>{ if(v==null||!isFinite(v)){pen=false;return;} d += (pen?'L':'M')+X(i).toFixed(1)+' '+Y(v).toFixed(1); pen=true; });
+    g += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="${s.w||2}" ${s.dash?`stroke-dasharray="${s.dash}"`:''} stroke-linejoin="round" opacity="${s.op||1}"/>`;
+    const li = s.data.length-1, lv = s.data[li];
+    if(lv!=null && s.dot!==false) g += `<circle cx="${X(li)}" cy="${Y(lv)}" r="3" fill="${s.color}"/>`;
+  });
+  return `<svg viewBox="0 0 ${Wd} ${H}">${g}</svg>`;
+}
+function heatBg(v, scale=10){
+  if(v==null) return 'transparent';
+  const a = clamp(Math.abs(v)/scale, 0.08, 0.85);
+  return v>=0 ? `rgba(255,77,94,${a})` : `rgba(61,139,255,${a})`;
+}
+
+/* ───────── 추가 지표: 국내 과열 · 대기 자금 · 선물 과열 · 낙폭 ───────── */
+const XAPI = {
+  upMarkets: 'https://api.upbit.com/v1/market/all?isDetails=false',
+  upTicker: m => 'https://api.upbit.com/v1/ticker?markets=' + m.join(','),
+  fx: ['https://open.er-api.com/v6/latest/USD', 'https://api.frankfurter.app/latest?from=USD&to=KRW'],
+  stable: 'https://stablecoins.llama.fi/stablecoincharts/all',
+  fundAll: 'https://fapi.binance.com/fapi/v1/premiumIndex',
+  fundHist: s => `https://fapi.binance.com/fapi/v1/fundingRate?symbol=${s}&limit=90`,
+  oiHist: s => `https://fapi.binance.com/futures/data/openInterestHist?symbol=${s}&period=1d&limit=30`
+};
+const LS_XCACHE = 'crf_xcache_v1';
+const DD_STAGES = [
+  {min:0,  t:'1단계 · 대기(방어 자산)', s:'아직 −15% 기준선 전'},
+  {min:15, t:'2단계 · 1차 분산 매수', s:'−15% 기준선 도달'},
+  {min:25, t:'3단계 · 핵심 매수', s:'−25% 기준선 도달'},
+  {min:35, t:'4단계 · 소량 레버리지 포함', s:'−35% 기준선 도달'},
+  {min:45, t:'5단계 · 마지막 매수', s:'−45% 기준선 도달'}
+];
+
+async function fetchUpbit(){
+  const all = await getJSON(XAPI.upMarkets, 10000);
+  const krw = all.filter(m => m.market && m.market.startsWith('KRW-'));
+  const names = Object.fromEntries(krw.map(m => [m.market, m.korean_name]));
+  const tick = [];
+  for(let i=0; i<krw.length; i+=100){
+    const part = await getJSON(XAPI.upTicker(krw.slice(i,i+100).map(m=>m.market)), 10000);
+    tick.push(...part);
+  }
+  return tick.map(t => ({m:t.market, s:t.market.slice(4).toLowerCase(), kn:names[t.market]||t.market.slice(4), p:+t.trade_price, ch:+t.signed_change_rate*100, v:+t.acc_trade_price_24h}));
+}
+async function fetchFx(){
+  for(const u of XAPI.fx){
+    try{ const j = await getJSON(u, 8000); const v = (j.rates && (j.rates.KRW)) ; if(v) return +v; }catch(e){}
+  }
+  return null;
+}
+async function fetchStable(){
+  const j = await getJSON(XAPI.stable, 15000);
+  return j.map(r => ({t:+r.date*1000, v:+(r.totalCirculatingUSD && r.totalCirculatingUSD.peggedUSD || 0)})).filter(x=>x.v>0).slice(-400);
+}
+async function fetchFutures(){
+  const [all, fb, fe, ob, oe] = await Promise.allSettled([
+    getJSON(XAPI.fundAll, 12000), getJSON(XAPI.fundHist('BTCUSDT'), 10000), getJSON(XAPI.fundHist('ETHUSDT'), 10000),
+    getJSON(XAPI.oiHist('BTCUSDT'), 10000), getJSON(XAPI.oiHist('ETHUSDT'), 10000)]);
+  const ok = r => r.status==='fulfilled' ? r.value : null;
+  const a = ok(all); if(!Array.isArray(a)) throw new Error('선물 데이터 없음');
+  return {
+    now: a.map(x => ({sym:x.symbol, r:+x.lastFundingRate})).filter(x => x.sym.endsWith('USDT') && isFinite(x.r)),
+    hb: (ok(fb)||[]).map(x => ({t:+x.fundingTime, r:+x.fundingRate})),
+    he: (ok(fe)||[]).map(x => ({t:+x.fundingTime, r:+x.fundingRate})),
+    ob: (ok(ob)||[]).map(x => ({t:+x.timestamp, v:+x.sumOpenInterestValue})),
+    oe: (ok(oe)||[]).map(x => ({t:+x.timestamp, v:+x.sumOpenInterestValue}))
+  };
+}
+async function loadExtras(){
+  const [up, fx, st, fu] = await Promise.allSettled([fetchUpbit(), fetchFx(), fetchStable(), fetchFutures()]);
+  const c = lsGet(LS_XCACHE) || {};
+  const X = {live:{}};
+  const take = (k, r, valid) => { if(r.status==='fulfilled' && valid(r.value)){ X[k] = r.value; X.live[k] = true; } else if(c[k]) X[k] = c[k]; };
+  take('upbit', up, v => Array.isArray(v) && v.length > 20);
+  take('fx', fx, v => v > 500);
+  take('stable', st, v => Array.isArray(v) && v.length > 40);
+  take('fut', fu, v => v && v.now && v.now.length > 10);
+  lsSet(LS_XCACHE, {upbit:X.upbit, fx:X.fx, stable:X.stable, fut:X.fut});
+  return X;
+}
+
+function analyzeExtras(D, A, X){
+  const R = {};
+  const all = D.markets.slice().sort((a,b)=>b.mc-a.mc);
+  const alts = all.filter(c => c.id!=='bitcoin' && !isExcluded(c));
+  const ranked = [A.btc, ...alts];
+  const bySym = new Map(); ranked.forEach((c,i) => { if(!bySym.has(c.s)) bySym.set(c.s, i+1); });
+  const tierOf = r => r==null ? 5 : r===1 ? 1 : r<=10 ? 2 : r<=50 ? 3 : r<=200 ? 4 : 5;
+  const STB = new Set(['usdt','usdc','usde','dai','usd1','fdusd','pyusd','tusd','usds']);
+
+  // 고점 대비 낙폭 (BTC, ETH)
+  R.dd = [A.btc, A.eth].filter(Boolean).map(c => {
+    const dd = c.athc!=null ? -c.athc : (c.ath && c.p ? (1 - c.p/c.ath)*100 : null);
+    let st = 0; if(dd!=null) DD_STAGES.forEach((s,i) => { if(dd >= s.min) st = i; });
+    const next = DD_STAGES[st+1];
+    return {c, dd, st, next, nextPrice: next && c.ath ? c.ath*(1-next.min/100) : null};
+  });
+
+  // 국내 과열
+  if(X.upbit){
+    const U = X.upbit;
+    const g = s => U.find(x => x.s===s);
+    const ub = g('btc'), ue = g('eth'), ut = g('usdt');
+    const fx = X.fx || null;
+    R.kp = {
+      btc: ub && fx && A.btc.p ? (ub.p/(A.btc.p*fx)-1)*100 : null,
+      eth: ue && fx && A.eth && A.eth.p ? (ue.p/(A.eth.p*fx)-1)*100 : null,
+      usdt: ut && fx ? (ut.p/fx-1)*100 : null, fx
+    };
+    const tot = U.reduce((s,x)=>s+(x.v||0),0);
+    const vBtc = ub ? ub.v : 0;
+    const altV = U.filter(x => x.s!=='btc' && !STB.has(x.s)).reduce((s,x)=>s+x.v,0);
+    const tierV = {2:0,3:0,4:0,5:0};
+    U.forEach(x => { if(x.s==='btc' || STB.has(x.s)) return; tierV[tierOf(bySym.get(x.s))] += x.v; });
+    R.kr = {
+      tot, btcShare: tot ? vBtc/tot*100 : null, altMul: vBtc ? altV/vBtc : null,
+      tierShare: Object.fromEntries([2,3,4,5].map(k => [k, altV ? tierV[k]/altV*100 : null])),
+      top: U.filter(x => !STB.has(x.s)).sort((a,b)=>b.v-a.v).slice(0,10).map(x => ({...x, tier: x.s==='btc'?1:tierOf(bySym.get(x.s)), rank: bySym.get(x.s)}))
+    };
+  }
+
+  // 대기 자금(스테이블코인)
+  if(X.stable && X.stable.length > 40){
+    const s = X.stable, n = s.length, now = s[n-1].v;
+    const at = d => s[Math.max(0, n-1-d)].v;
+    R.st = {series:s.slice(-365), now, ch7:(now/at(7)-1)*100, ch30:(now/at(30)-1)*100, ch90:(now/at(90)-1)*100};
+  }
+
+  // 선물 과열
+  if(X.fut){
+    const F = X.fut;
+    const fmap = new Map(F.now.map(x => [x.sym, x.r]));
+    const fr = s => { for(const k of [s.toUpperCase()+'USDT', '1000'+s.toUpperCase()+'USDT', '1000000'+s.toUpperCase()+'USDT']) if(fmap.has(k)) return fmap.get(k); return null; };
+    const med = arr => { const a = arr.filter(v=>v!=null).sort((x,y)=>x-y); return a.length ? a[Math.floor(a.length/2)] : null; };
+    const tierFund = {};
+    tierFund[1] = fr('btc');
+    tierFund[2] = med(alts.slice(0,9).map(c=>fr(c.s)));
+    tierFund[3] = med(alts.slice(9,49).map(c=>fr(c.s)));
+    tierFund[4] = med(alts.slice(49,199).map(c=>fr(c.s)));
+    const chg = h => h && h.length > 5 ? (h[h.length-1].v/h[0].v-1)*100 : null;
+    const avg7 = h => { const a = h.slice(-21).map(x=>x.r); return a.length ? a.reduce((p,c)=>p+c,0)/a.length : null; };
+    R.fu = {
+      btc: fr('btc'), eth: fr('eth'), tierFund,
+      btc7: avg7(F.hb), eth7: avg7(F.he),
+      hb: F.hb.slice(-90), he: F.he.slice(-90),
+      ob: F.ob, oe: F.oe, obCh: chg(F.ob), oeCh: chg(F.oe)
+    };
+    // 레버리지 온도 0~100: 펀딩 0.01%/8h = 50
+    const f = R.fu.btc7 ?? R.fu.btc, fa = tierFund[3] ?? tierFund[2];
+    const sc = r => r==null ? null : clamp(50 + (r*100 - 0.01)/0.04*50, 0, 100);
+    const parts = [[0.45, sc(f)], [0.35, sc(fa)], [0.2, R.fu.obCh==null?null:clamp(50 + R.fu.obCh*1.5, 0, 100)]].filter(p=>p[1]!=null);
+    R.fu.heat = parts.length ? Math.round(parts.reduce((s,p)=>s+p[0]*p[1],0)/parts.reduce((s,p)=>s+p[0],0)) : null;
+  }
+  return R;
+}
+
+/* 대응 메모: 과거 패턴 기준 행동 요령 */
+function buildMemo(A, R){
+  const M = [];
+  const bear = A.regime.t==='하락장';
+  const base = {
+    1: bear ? ['🛡', '비트코인 피난처 국면입니다. 알트코인 추격 매수는 피하고, 고점 대비 낙폭 기준선(아래)에 맞춘 BTC 중심 분할 매수가 과거 패턴에 맞습니다.']
+            : ['🟠', '비트코인 중심 구간입니다. 과거에는 이 시기에 BTC를 먼저 모으고, 알트코인은 소액으로 관찰만 했습니다.'],
+    2: ['🟣', 'ETH·대형 알트로 돈이 옮겨 가는 구간입니다. 과거에는 BTC 수익 일부를 ETH·대형 알트로 나누는 시점이었습니다.'],
+    3: ['🔵', '중형 알트 테마 순환 구간입니다. 수익이 난 대형 알트는 일부 차익 실현을 시작하고, 새로 들어가는 돈은 소액으로 나누는 것이 과거 패턴입니다.'],
+    4: ['🔴', '소형 알트 과열 구간입니다. 과거에는 사이클 정점 부근이었습니다. 분할 차익 실현과 레버리지 축소를 검토하고, 소형 코인 신규 매수는 자제할 때입니다.']
+  }[A.stage];
+  M.push({i:base[0], t:base[1], lv: A.stage===4 ? 'hot' : 'info'});
+  if(R.dd) R.dd.forEach(d => {
+    if(d.dd==null) return;
+    const nm = d.c.id==='bitcoin' ? 'BTC' : 'ETH';
+    if(d.st >= 1) M.push({i:'📉', t:`${nm}는 고점 대비 −${d.dd.toFixed(1)}%로 5단계 매수 기준의 <b>${DD_STAGES[d.st].t}</b>에 있습니다.${d.next?` 다음 기준선(−${d.next.min}%)은 ${fUsd(d.nextPrice)}입니다.`:' 마지막 기준선을 넘었습니다.'}`, lv:'buy'});
+  });
+  if(R.kp && R.kp.btc!=null){
+    if(R.kp.btc >= 10) M.push({i:'🇰🇷', t:`김치 프리미엄 ${R.kp.btc.toFixed(1)}% — 국내 과열이 심합니다. 2018년 1월·2021년 4월 정점 때 10~20%까지 올랐습니다.`, lv:'hot'});
+    else if(R.kp.btc >= 5) M.push({i:'🇰🇷', t:`김치 프리미엄 ${R.kp.btc.toFixed(1)}% — 국내 매수 열기가 높아지고 있습니다. 국내 거래소 추격 매수에 주의하세요.`, lv:'warn'});
+    else if(R.kp.btc <= -1) M.push({i:'🇰🇷', t:`김치 프리미엄이 ${R.kp.btc.toFixed(1)}%(역프리미엄)입니다. 국내 투자 심리가 얼어붙은 상태로, 과거에는 바닥권에서 자주 나타났습니다.`, lv:'buy'});
+  }
+  if(R.kr && R.kr.altMul!=null && R.kr.altMul >= 10) M.push({i:'🎢', t:`업비트 알트코인 거래대금이 비트코인의 ${R.kr.altMul.toFixed(1)}배입니다. 국내 개인 투자자의 알트 쏠림이 강합니다.`, lv:'warn'});
+  if(R.fu){
+    const f = R.fu.btc7 ?? R.fu.btc;
+    if(f!=null){
+      if(f >= 0.0005) M.push({i:'⚡', t:`BTC 펀딩비가 8시간 평균 ${(f*100).toFixed(3)}%로 높습니다. 빚내서 산 매수가 몰려 있어 급락(강제 청산) 위험이 큽니다.`, lv:'hot'});
+      else if(f >= 0.0003) M.push({i:'⚡', t:`BTC 펀딩비가 ${(f*100).toFixed(3)}%로 평소보다 높습니다. 레버리지를 줄일 때입니다.`, lv:'warn'});
+      else if(f < 0) M.push({i:'⚡', t:`BTC 펀딩비가 음수(${(f*100).toFixed(3)}%)입니다. 하락에 거는 쪽이 많아, 과거에는 반등이 자주 뒤따랐습니다.`, lv:'buy'});
+    }
+    if(R.fu.obCh!=null && R.fu.obCh >= 25) M.push({i:'📈', t:`BTC 미결제약정이 30일 동안 ${R.fu.obCh.toFixed(0)}% 늘었습니다. 레버리지가 빠르게 쌓이는 중입니다.`, lv:'warn'});
+  }
+  if(R.st){
+    if(R.st.ch30 >= 3) M.push({i:'💵', t:`스테이블코인이 30일 동안 ${R.st.ch30.toFixed(1)}% 늘었습니다. 시장에 새 대기 자금이 들어오고 있습니다(상승 연료).`, lv:'buy'});
+    else if(R.st.ch30 <= -1) M.push({i:'💵', t:`스테이블코인이 30일 동안 ${R.st.ch30.toFixed(1)}% 줄었습니다. 코인 시장에서 돈이 빠져나가고 있습니다.`, lv:'warn'});
+  }
+  if(A.heat >= 75) M.push({i:'🌡', t:`순환 온도 ${A.heat} — 과열 구간입니다. 한 번에 사지 말고 나눠서 대응하세요.`, lv:'hot'});
+  return M;
+}
+
+/* 추가 카드 그리기 */
+function renderExtras(D, A, R){
+  const out = {};
+  // 대응 메모
+  const M = buildMemo(A, R);
+  const lvCol = {hot:'rgba(255,77,94,.13)', warn:'rgba(255,176,32,.12)', buy:'rgba(61,139,255,.12)', info:'rgba(255,255,255,.04)'};
+  out.memo = `<div class="card"><h2>🧭 지금 대응 메모 <span class="hint">과거 패턴 기준</span></h2>
+    ${M.map(m=>`<div class="memo" style="background:${lvCol[m.lv]}"><span class="mi">${m.i}</span><span>${m.t}</span></div>`).join('')}
+    <div class="cap">과거 사이클에서 나타난 경향을 정리한 메모입니다. 투자 권유가 아니며, 최종 판단은 직접 하셔야 합니다.</div></div>`;
+
+  // 낙폭 · 5단계
+  if(R.dd && R.dd.length){
+    const bar = d => {
+      const max = 60, pos = d.dd==null ? 0 : clamp(d.dd,0,max)/max*100;
+      const ticks = [15,25,35,45].map(t => `<div class="ddt" style="left:${t/max*100}%"><span>−${t}%</span></div>`).join('');
+      const nm = d.c.id==='bitcoin' ? '비트코인' : '이더리움';
+      return `<div class="dd">
+        <div class="ddh"><b>${nm}</b><span>${fUsd(d.c.p)} · 고점 ${fUsd(d.c.ath)}${d.c.athd?` (${new Date(d.c.athd).toLocaleDateString('ko-KR',{year:'2-digit',month:'numeric',day:'numeric'})})`:''}</span></div>
+        <div class="ddbar"><div class="ddfill" style="width:${pos}%"></div>${ticks}<div class="ddk" style="left:${pos}%"></div></div>
+        <div class="ddv"><span class="dn">−${d.dd!=null?d.dd.toFixed(1):'–'}%</span><span class="ddst st${d.st}">${DD_STAGES[d.st].t}</span></div>
+        <div class="cap" style="margin-top:2px">${d.next?`다음 기준선 −${d.next.min}%: <b>${fUsd(d.nextPrice)}</b> (지금보다 ${fP((d.nextPrice/d.c.p-1)*100)})`:'마지막(−45%) 기준선 아래입니다.'}</div>
+      </div>`;
+    };
+    out.dd = `<div class="card"><h2>📉 고점 대비 낙폭 · 5단계 매수 기준 <span class="hint">사상 최고가 기준</span></h2>${R.dd.map(bar).join('')}
+      <div class="cap">−15%·−25%·−35%·−45% 기준선은 쓰시는 5단계 분할매수 기준입니다. 기준선마다 나눠 사는 방식이며, 한 번에 다 사는 신호가 아닙니다.</div></div>`;
+  }
+
+  // 국내 과열
+  if(R.kr){
+    const kp = R.kp || {};
+    const kpCls = v => v==null ? 'mut' : v>=5 ? 'up' : v<=-1 ? 'dn' : '';
+    const tl = k => k===1?'BTC':k===5?'순위밖':k+'단계';
+    const tc = k => k===1?'#f7931a':k===2?'#8c8cf7':k===3?'#26c6da':k===4?'#ff4f8b':'#8d97bd';
+    const sh = R.kr.tierShare;
+    out.kr = `<div class="card"><h2>🇰🇷 국내 과열 · 업비트 <span class="hint">환율 ${kp.fx?Math.round(kp.fx).toLocaleString('ko-KR')+'원':'–'}</span></h2>
+      <div class="kpis">
+        <div class="kpi"><div class="k">김치 프리미엄(BTC)</div><div class="v ${kpCls(kp.btc)}">${kp.btc!=null?(kp.btc>0?'+':'')+kp.btc.toFixed(2)+'%':'–'}</div><div class="d">ETH ${kp.eth!=null?(kp.eth>0?'+':'')+kp.eth.toFixed(2)+'%':'–'} · 테더 ${kp.usdt!=null?(kp.usdt>0?'+':'')+kp.usdt.toFixed(2)+'%':'–'}</div></div>
+        <div class="kpi"><div class="k">알트 쏠림 배수</div><div class="v ${R.kr.altMul>=10?'up':''}">${R.kr.altMul!=null?R.kr.altMul.toFixed(1)+'배':'–'}</div><div class="d">24시간 거래대금 ${(R.kr.tot/1e12).toFixed(2)}조원 · BTC ${R.kr.btcShare!=null?R.kr.btcShare.toFixed(0)+'%':'–'}</div></div>
+      </div>
+      <div class="share">${[2,3,4,5].map(k=>`<div style="width:${sh[k]||0}%;background:${tc(k)}" title="${tl(k)}"></div>`).join('')}</div>
+      <div class="legend">${[2,3,4,5].map(k=>`<span><i style="background:${tc(k)}"></i>${tl(k)} ${sh[k]!=null?sh[k].toFixed(0)+'%':'–'}</span>`).join('')}</div>
+      <div class="cap" style="margin-bottom:6px">위 막대는 업비트 알트코인 거래대금이 어느 단계 코인에 몰렸는지 보여 줍니다. 소형·순위밖 비중이 커지면 국내 투기 열기가 높다는 뜻입니다.</div>
+      <table class="rt"><tr><th>거래대금 Top 10</th><th>단계</th><th>24시간</th><th>거래대금</th></tr>
+      ${R.kr.top.map((x,i)=>`<tr><td class="cn">${i+1}. <b>${esc(x.s.toUpperCase())}</b> ${esc(x.kn)}</td><td style="color:${tc(x.tier)}">${tl(x.tier)}</td><td class="${cls(x.ch)}">${fP(x.ch)}</td><td>${(x.v/1e8).toLocaleString('ko-KR',{maximumFractionDigits:0})}억</td></tr>`).join('')}</table>
+      <div class="cap">김치 프리미엄 = 업비트 가격이 해외 가격(원화 환산)보다 몇 % 비싼지입니다. 5% 이상은 국내 과열, 0% 아래(역프리미엄)는 국내 공포입니다.</div></div>`;
+  }
+
+  // 선물 과열
+  if(R.fu){
+    const F = R.fu;
+    const fp = r => r==null ? '–' : (r>0?'+':'')+(r*100).toFixed(4)+'%';
+    const fc = r => r==null ? 'mut' : r>=0.0003 ? 'up' : r<0 ? 'dn' : '';
+    const ann = r => r==null ? '' : `연 ${(r*3*365*100).toFixed(0)}%`;
+    const Zf = [[0,25,'#2f6fe0'],[25,45,'#3c5aa8'],[45,55,'#5d6790'],[55,75,'#b0506a'],[75,100,'#ff4d5e']];
+    const ht = F.heat==null ? '' : F.heat>=75?'과열':F.heat>=60?'다소 높음':F.heat>=40?'보통':'숏 우세';
+    let chart = '';
+    if(F.hb && F.hb.length > 10){
+      chart = lineChart({series:[{data:F.hb.map(x=>x.r*100), color:'#f7931a', w:1.8, zeroColor:'#6b76a6'},{data:(F.he||[]).map(x=>x.r*100), color:'#8c8cf7', w:1.4, op:.85}], height:150, zero:true, yFmt:v=>v.toFixed(3)+'%',
+        xLabels:[[0,'30일 전'],[F.hb.length-1,'지금']]});
+    }
+    let oi = '';
+    if(F.ob && F.ob.length > 5){
+      oi = `<div class="kpi" style="margin-top:8px"><div class="k">BTC 미결제약정(선물 계약 총액)</div><div class="v">$${(F.ob[F.ob.length-1].v/1e9).toFixed(1)}B</div><div class="d">30일 <span class="${cls(F.obCh)}">${fP(F.obCh)}</span>${F.oeCh!=null?` · ETH <span class="${cls(F.oeCh)}">${fP(F.oeCh)}</span>`:''}</div>${sparkSVG(F.ob.map(x=>x.v),'#f7931a',150,28,false).replace('class="spk"','')}</div>`;
+    }
+    out.fu = `<div class="card"><h2>⚡ 선물 과열(레버리지) <span class="hint">바이낸스 선물</span></h2>
+      <div class="futop"><div class="g" style="flex:0 0 120px"><div class="gt">레버리지 온도</div>${gaugeSVG(F.heat, Zf)}<div class="gv">${F.heat??'–'}</div><div class="gs">${ht}</div></div>
+      <table class="rt" style="flex:1"><tr><th>펀딩비(8시간)</th><th>현재</th></tr>
+        <tr><td class="cn"><b>BTC</b><div class="use">7일 평균 ${fp(F.btc7)} · ${ann(F.btc7)}</div></td><td class="${fc(F.btc)}">${fp(F.btc)}</td></tr>
+        <tr><td class="cn"><b>ETH</b><div class="use">7일 평균 ${fp(F.eth7)}</div></td><td class="${fc(F.eth)}">${fp(F.eth)}</td></tr>
+        <tr><td class="cn">2단계 중간값</td><td class="${fc(F.tierFund[2])}">${fp(F.tierFund[2])}</td></tr>
+        <tr><td class="cn">3단계 중간값</td><td class="${fc(F.tierFund[3])}">${fp(F.tierFund[3])}</td></tr>
+        <tr><td class="cn">4단계 중간값</td><td class="${fc(F.tierFund[4])}">${fp(F.tierFund[4])}</td></tr></table></div>
+      ${chart?`<div class="chart" style="margin-top:6px">${chart}</div><div class="legend"><span><i style="background:#f7931a"></i>BTC 펀딩비</span><span><i style="background:#8c8cf7"></i>ETH 펀딩비</span></div>`:''}
+      ${oi}
+      <div class="cap">펀딩비 = 선물 가격을 현물에 맞추려고 매수·매도 쪽이 8시간마다 주고받는 이자입니다. 평소 0.01%이며, 0.03% 이상이면 빚내서 산 매수가 과열, 음수면 하락 베팅이 과열입니다.</div></div>`;
+  }
+
+  // 대기 자금
+  if(R.st){
+    const s = R.st.series, L = s.length;
+    const lbl = [0, Math.round(L/2), L-1].map(i=>[i, new Date(s[i].t).toLocaleDateString('ko-KR',{year:'2-digit',month:'numeric'})]);
+    out.st = `<div class="card chart"><h2>💵 대기 자금(스테이블코인) <span class="hint">DefiLlama</span></h2>
+      <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
+        <div class="kpi"><div class="k">총액</div><div class="v">$${(R.st.now/1e9).toFixed(1)}B</div></div>
+        <div class="kpi"><div class="k">7일</div><div class="v ${cls(R.st.ch7)}" style="font-size:16px">${fP(R.st.ch7,2)}</div></div>
+        <div class="kpi"><div class="k">30일</div><div class="v ${cls(R.st.ch30)}" style="font-size:16px">${fP(R.st.ch30,2)}</div></div>
+      </div>
+      <div style="margin-top:8px">${lineChart({series:[{data:s.map(x=>x.v/1e9), color:'#5be3a0', w:2}], height:140, xLabels:lbl, yFmt:v=>'$'+v.toFixed(0)+'B'})}</div>
+      <div class="cap">스테이블코인(USDT·USDC처럼 1달러에 고정된 코인) 총액은 코인을 사려고 대기 중인 돈입니다. 늘어나면 새 돈이 들어오는 것이고(상승 연료), 줄어들면 시장에서 돈이 빠지는 것입니다. 90일 ${fP(R.st.ch90)}</div></div>`;
+  }
+  return out;
+}
+
+/* ───────── 화면 ───────── */
+function render(D, A, R){
+  const E = R ? renderExtras(D, A, R) : {};
+  const T = A.tiers, st = STAGE_TXT[A.stage];
+  const lines = [];
+  lines.push(st.d);
+  if(A.dom.dBtc7!=null){
+    if(A.dom.dBtc7 > 0.3) lines.push(`비트코인 도미넌스(시장 점유율)가 7일 동안 ${A.dom.dBtc7.toFixed(1)}%p 올라 비트코인 쏠림이 강해지고 있습니다.`);
+    else if(A.dom.dBtc7 < -0.3) lines.push(`비트코인 도미넌스가 7일 동안 ${Math.abs(A.dom.dBtc7).toFixed(1)}%p 내려 알트코인 쪽으로 자금이 퍼지고 있습니다.`);
+    else lines.push('비트코인 도미넌스는 7일 동안 거의 변화가 없습니다.');
+  }
+  if(A.eb && A.eb.ch30!=null) lines.push(`ETH/BTC(이더리움을 비트코인으로 환산한 값)는 30일간 ${fP(A.eb.ch30)}${A.eb.ch30>3?' — 이더리움으로 자금이 이동하는 신호입니다.':A.eb.ch30<-3?' — 이더리움이 비트코인보다 약합니다.':'로 큰 변화가 없습니다.'}`);
+  if(A.lead > A.stage) lines.push(`가장 강한 계층은 ${TIERS[A.lead-1].short}입니다. 다음 단계로 넘어가는 신호도 보입니다.`);
+  else if(A.lead < A.stage) lines.push(`가장 강한 계층은 ${TIERS[A.lead-1].short}입니다. 자금이 한 단계 위로 되돌아가는 중일 수 있습니다.`);
+  let alert = '', note = '';
+  if(A.stage===4 && A.fng && A.fng.v>=75) alert = '⚠ 소형 알트 과열 + 극단적 탐욕입니다. 2018년 1월·2021년 5월 정점 직전과 비슷한 모습입니다. 추격 매수에 주의하세요.';
+  else if(A.heat>=75) alert = '⚠ 순환 온도가 과열 구간(75 이상)입니다. 과거에는 이 구간이 길게 이어지지 않았습니다.';
+  if(A.regime.t==='하락장' && A.stage===1) note = '하락장에서 알트코인이 비트코인보다 더 많이 빠지는 ‘비트코인 피난처’ 국면입니다. 과거에는 이 시기가 끝나야 다음 순환이 시작됐습니다.';
+  else if(A.stage===1 && A.alt30!=null && A.alt30<=25) note = '알트시즌 지수가 25 이하인 ‘비트코인 시즌’입니다. 2024~2026년 사이클은 이 상태가 길게 이어졌습니다.';
+
+  const heroHTML = `
+  <div class="card hero">
+    <div class="lab">지금 순환 위치 · <span class="${A.regime.c}">${A.regime.t}</span> (시장 30일 ${fP(A.tot30)})</div>
+    <div class="stage" style="color:${TIERS[A.stage-1].hex}">${A.stage}단계 · ${st.t}</div>
+    <div class="pos">위치 <b>${A.pos.toFixed(2)}</b> / 4 &nbsp;·&nbsp; 가장 강한 계층: <b style="color:${TIERS[A.lead-1].hex}">${TIERS[A.lead-1].short}</b></div>
+    <div class="posbar"><div class="knob" style="left:${((A.pos-1)/3*100).toFixed(1)}%"></div></div>
+    <div class="poslab"><span>① BTC</span><span>② ETH·대형</span><span>③ 중형</span><span>④ 소형</span></div>
+    <div class="sum">${lines.map(l=>`<p>${l}</p>`).join('')}</div>
+    ${alert?`<div class="alert">${alert}</div>`:''}${note?`<div class="note">${note}</div>`:''}
+  </div>`;
+
+  // 사다리
+  let lad = '';
+  TIERS.forEach((tt, i) => {
+    const t = T[tt.k];
+    const lead = A.lead===tt.k;
+    const m = tt.k===1
+      ? `<div class="m"><div class="k">24시간</div><div class="v ${cls(t.ret.r24)}">${fP(t.ret.r24)}</div></div>
+         <div class="m"><div class="k">7일</div><div class="v ${cls(t.ret.r7)}">${fP(t.ret.r7)}</div></div>
+         <div class="m"><div class="k">30일</div><div class="v ${cls(t.ret.r30)}">${fP(t.ret.r30)}</div></div>`
+      : `<div class="m"><div class="k">7일 BTC대비</div><div class="v ${cls(t.ex.r7)}">${fPP(t.ex.r7)}</div></div>
+         <div class="m"><div class="k">30일 BTC대비</div><div class="v ${cls(t.ex.r30)}">${fPP(t.ex.r30)}</div></div>
+         <div class="m"><div class="k">BTC 이긴 비율</div><div class="v">${t.breadth.r7!=null?Math.round(t.breadth.r7)+'%':'–'}</div></div>`;
+    const movers = tt.k===1
+      ? `<span class="mv">$${A.btc.p?Math.round(A.btc.p).toLocaleString('en-US'):'–'}</span><span class="mv">도미넌스 ${A.dom.btc!=null?A.dom.btc.toFixed(1)+'%':'–'}</span>`
+      : `<span class="mvl">7일 상승 Top</span>` + t.movers.map(c=>`<span class="mv">${esc(c.s.toUpperCase())} <b class="${cls(c.r7)}">${fP(c.r7,0)}</b></span>`).join('');
+    const R = A.reps[tt.k];
+    const repRow = tt.k===1 ? '' : `<div class="reps"><div class="rh2"><span>⭐ 대표 5종 · 7일</span><span>평균 BTC대비 <b class="${cls(R.avg7)}">${fPP(R.avg7)}</b></span></div>
+      <div class="rgrid">${R.list.map(x=>`<div class="rc${x.tierNow && x.tierNow!==tt.k?' moved':''}"><div class="rs">${x.sym.toUpperCase()}</div><div class="rv ${cls(x.c&&x.c.r7)}">${x.c?fP(x.c.r7):'–'}</div></div>`).join('')}</div></div>`;
+    const spk = tt.k===1 ? sparkSVG(t.abs, tt.hex) : sparkSVG(t.rel, tt.hex);
+    lad += `<div class="tier ${lead?'lead':''}" data-k="${tt.k}" style="--tc:${tt.hex}">
+      <div class="top"><span class="nm">${tt.k}. ${tt.name}</span><span class="rg">${tt.range}</span>${lead?'<span class="badge">돈이 몰리는 곳</span>':''}</div>
+      <div class="row">${m}</div>
+      <div class="bot"><div class="movers">${movers}</div>${spk}</div>${repRow}
+    </div>`;
+    if(i<3){
+      const f = A.flows[i];
+      const down = f.f > 0, still = f.lvl===0;
+      const col = still ? '#5d6790' : down ? '#ff4d5e' : '#3d8bff';
+      const txt = still ? `<b style="color:${col}">정체</b> · 뚜렷한 이동 없음`
+        : down ? `<b style="color:${col}">↓ ${f.lvl===2?'강한':'약한'} 이동</b> · 아래 계층이 ${f.f.toFixed(1)}점 더 강함`
+               : `<b style="color:${col}">↑ ${f.lvl===2?'강한':'약한'} 후퇴</b> · 위 계층이 ${Math.abs(f.f).toFixed(1)}점 더 강함`;
+      const head = down||still ? `<path d="M5 24 L11 32 L17 24" fill="none" stroke="${col}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>` : `<path d="M5 10 L11 2 L17 10" fill="none" stroke="${col}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>`;
+      lad += `<div class="flow ${still?'still':down?'':'upw'}"><svg class="arr" viewBox="0 0 22 34"><line class="ln" x1="11" y1="2" x2="11" y2="32" stroke="${col}" stroke-width="${f.lvl===2?3.2:2.2}"/>${head}</svg><span class="t">${txt}</span></div>`;
+    }
+  });
+  const ladderHTML = `<div class="card"><h2>🔄 자금 순환 사다리 <span class="hint">BTC 대비 강도 · 7일 흐름선</span></h2>
+    <div class="ladder" id="ladder"><div class="rail"></div><div class="here" id="here"></div>${lad}</div>
+    <div class="cap">점수 = 24시간·7일·30일 초과수익을 2:5:3으로 섞은 값(%p). 흐름선은 최근 7일 동안 그 계층이 비트코인보다 얼마나 강했는지(비트코인은 자체 가격)입니다.</div></div>`;
+
+  // 대표 코인 표
+  let repTbl = '';
+  for(const k of [2,3,4]){
+    const R = A.reps[k], tt = TIERS[k-1];
+    repTbl += `<tr class="grp"><td colspan="4" style="color:${tt.hex}">${k}단계 · ${tt.name} <span class="mut">(평균 BTC대비 7일 <b class="${cls(R.avg7)}">${fPP(R.avg7)}</b> · 30일 <b class="${cls(R.avg30)}">${fPP(R.avg30)}</b>)</span></td></tr>`;
+    R.list.forEach(x => {
+      const moved = x.tierNow && x.tierNow!==k ? `<span class="tagm">${x.tierNow===5?'200위 밖':'지금 '+x.tierNow+'단계'}</span>` : '';
+      repTbl += `<tr><td class="cn"><b>${x.sym.toUpperCase()}</b> ${x.kn}${moved}<div class="use">${x.use}${x.rank?' · '+x.rank+'위':''}</div></td>
+        <td class="${cls(x.c&&x.c.r7)}">${x.c?fP(x.c.r7):'–'}</td><td class="${cls(x.c&&x.c.r30)}">${x.c?fP(x.c.r30):'–'}</td>
+        <td style="background:${heatBg(x.ex7,10)}">${fPP(x.ex7)}</td></tr>`;
+    });
+  }
+  const repHTML = `<div class="card"><h2>⭐ 단계별 대표 코인 <span class="hint">순위는 스테이블코인 제외 기준</span></h2>
+    <table class="rt"><tr><th>코인</th><th>7일</th><th>30일</th><th>BTC대비 7일</th></tr>${repTbl}</table>
+    <div class="cap">대표 코인이 비트코인보다 차례로 강해지면(빨강) 그 단계로 돈이 들어오는 신호입니다. ‘지금 n단계’ 표시는 순위가 바뀌어 다른 단계로 옮겨 간 코인입니다. 매수 추천이 아니라 관찰용 목록입니다.</div></div>`;
+
+  // 게이지
+  const fv = A.fng ? A.fng.v : null;
+  const heatTxt = A.heat>=75?'과열':A.heat>=55?'순환 진행':A.heat>=35?'중립':'비트코인 쏠림';
+  const altTxt = A.alt30==null?'':A.alt30>=75?'알트시즌':A.alt30<=25?'비트코인 시즌':'중간';
+  const fngTxt = A.fng ? ({'Extreme Fear':'극단적 공포','Fear':'공포','Neutral':'중립','Greed':'탐욕','Extreme Greed':'극단적 탐욕'}[A.fng.c]||A.fng.c) : '';
+  const Z = [[0,25,'#2f6fe0'],[25,45,'#3c5aa8'],[45,55,'#5d6790'],[55,75,'#b0506a'],[75,100,'#ff4d5e']];
+  const gaugeHTML = `<div class="card"><h2>🧭 계기판</h2><div class="gauges">
+    <div class="g"><div class="gt">순환 온도</div>${gaugeSVG(A.heat, Z)}<div class="gv">${A.heat}</div><div class="gs">${heatTxt}</div></div>
+    <div class="g"><div class="gt">알트시즌 지수</div>${gaugeSVG(A.alt30, [[0,25,'#2f6fe0'],[25,75,'#5d6790'],[75,100,'#ff4d5e']])}<div class="gv">${A.alt30??'–'}</div><div class="gs">${altTxt} · 7일 ${A.alt7??'–'}</div></div>
+    <div class="g"><div class="gt">공포·탐욕</div>${gaugeSVG(fv, Z)}<div class="gv">${fv??'–'}</div><div class="gs">${fngTxt}</div></div>
+  </div><div class="cap">빨간 바깥 띠(75~100)는 과열·위험 구간입니다. 알트시즌 지수는 상위 100개 알트 중 30일간 비트코인보다 많이 오른 비율(자체 계산)입니다.</div></div>`;
+
+  // KPI
+  const fngSeries = A.fng ? D.fng.map(x=>x.v) : null;
+  const ebSpark = A.eb && A.eb.series ? A.eb.series.slice(-60).map(x=>x.v) : null;
+  const domSpark = [A.dom.btc30, A.dom.btc7, A.dom.btc24, A.dom.btc].map(v=>v);
+  const kpiHTML = `<div class="card"><h2>📊 핵심 지표</h2><div class="kpis">
+    <div class="kpi"><div class="k">비트코인 도미넌스</div><div class="v">${A.dom.btc!=null?A.dom.btc.toFixed(2)+'%':'–'}</div>
+      <div class="d">7일 <span class="${cls(A.dom.dBtc7)}">${fPP(A.dom.dBtc7,2)}</span> · 30일 <span class="${cls(A.dom.dBtc30)}">${fPP(A.dom.dBtc30,2)}</span></div>${sparkSVG(domSpark,'#f7931a',150,28,false).replace('class="spk"','')}</div>
+    <div class="kpi"><div class="k">이더리움 도미넌스</div><div class="v">${A.dom.eth!=null?A.dom.eth.toFixed(2)+'%':'–'}</div>
+      <div class="d">7일 <span class="${cls(A.dom.dEth7)}">${fPP(A.dom.dEth7,2)}</span> · 30일 <span class="${cls(A.dom.dEth30)}">${fPP(A.dom.dEth30,2)}</span></div>${sparkSVG([A.dom.eth30,A.dom.eth7,A.dom.eth],'#8c8cf7',150,28,false).replace('class="spk"','')}</div>
+    <div class="kpi"><div class="k">ETH/BTC</div><div class="v">${A.eb&&A.eb.now?A.eb.now.toFixed(5):'–'}</div>
+      <div class="d">30일 <span class="${cls(A.eb&&A.eb.ch30)}">${fP(A.eb&&A.eb.ch30)}</span>${A.eb&&A.eb.ch90!=null?` · 90일 <span class="${cls(A.eb.ch90)}">${fP(A.eb.ch90)}</span>`:''}</div>${ebSpark?sparkSVG(ebSpark,'#8c8cf7',150,28,false).replace('class="spk"',''):''}</div>
+    <div class="kpi"><div class="k">비트코인 가격</div><div class="v">${fUsd(A.btc.p)}</div>
+      <div class="d">24시간 <span class="${cls(A.btc.r24)}">${fP(A.btc.r24)}</span> · 7일 <span class="${cls(A.btc.r7)}">${fP(A.btc.r7)}</span></div>${sparkSVG(A.btc.sp,'#f7931a',150,28,false).replace('class="spk"','')}</div>
+  </div><div class="cap">도미넌스의 7일·30일 변화와 흐름선은 상위 250개 코인 시가총액으로 거꾸로 계산한 추정치입니다.</div></div>`;
+
+  // 7일 상대 성과 차트
+  const n = SPK_N, now = Date.now();
+  const xl = [[0,'7일 전'],[Math.round((n-1)*3/7),'4일 전'],[Math.round((n-1)*5/7),'2일 전'],[n-1,'지금']];
+  const relHTML = `<div class="card chart"><h2>📈 최근 7일, 누가 비트코인을 이겼나 <span class="hint">BTC=0 기준선</span></h2>
+    ${lineChart({series:[2,3,4].filter(k=>T[k].rel).map(k=>({data:T[k].rel, color:TIERS[k-1].hex, w:k===2?2.4:2})), zero:true, xLabels:xl, yFmt:v=>(v>0?'+':'')+v.toFixed(1)+'%'})}
+    <div class="legend"><span><i style="background:#f7931a"></i>비트코인(기준 0)</span><span><i style="background:#8c8cf7"></i>ETH·대형</span><span><i style="background:#26c6da"></i>중형</span><span><i style="background:#ff4f8b"></i>소형</span></div>
+    <div class="cap">선이 0 위에 있으면 그 계층이 비트코인보다 강했다는 뜻입니다. 선이 위에서부터 ETH → 중형 → 소형 순으로 차례로 올라오면 교과서적인 순환입니다.</div></div>`;
+
+  // 기간별 히트맵
+  const rowsP = [['r24','24시간'],['r7','7일'],['r30','30일']];
+  const htHTML = `<div class="card"><h2>🗓 기간별 성적표 <span class="hint">BTC는 자체 수익률, 나머지는 BTC 대비</span></h2>
+    <table class="ht"><tr><th></th>${TIERS.map(t=>`<th style="color:${t.hex}">${t.short}</th>`).join('')}</tr>
+    ${rowsP.map(([p,lab])=>`<tr><td class="rh">${lab}</td>${TIERS.map(t=>{const v = t.k===1?T[1].ret[p]:T[t.k].ex[p]; return `<td style="background:${heatBg(v, p==='r30'?20:p==='r7'?10:5)}">${t.k===1?fP(v):fPP(v)}</td>`;}).join('')}</tr>`).join('')}
+    <tr><td class="rh">종합점수</td>${TIERS.map(t=>`<td style="background:${heatBg(T[t.k].rs,8)};outline:${A.lead===t.k?'2px solid #fff':'none'}">${t.k===1?'0 (기준)':(T[t.k].rs>0?'+':'')+T[t.k].rs.toFixed(1)}</td>`).join('')}</tr></table></div>`;
+
+  // ETH/BTC 1년
+  let ebHTML = '';
+  if(A.eb && A.eb.series){
+    const s = A.eb.series, L = s.length;
+    const lbl = [0, Math.round(L/3), Math.round(2*L/3), L-1].map(i=>[i, new Date(s[i].t).toLocaleDateString('ko-KR',{year:'2-digit',month:'numeric'})]);
+    const above = A.eb.ma200 ? A.eb.now > A.eb.ma200 : null;
+    ebHTML = `<div class="card chart"><h2>Ξ ETH/BTC 1년 흐름 <span class="hint">2단계 진입 신호</span></h2>
+      ${lineChart({series:[{data:s.map(x=>x.v), color:'#8c8cf7', w:2},{data:A.eb.ma, color:'#ffb020', w:1.4, dash:'4 3', dot:false}], xLabels:lbl, yFmt:v=>v.toFixed(4)})}
+      <div class="legend"><span><i style="background:#8c8cf7"></i>ETH/BTC</span><span><i style="background:#ffb020"></i>200일 이동평균(장기 평균선)</span></div>
+      <div class="cap">${above==null?'':above?'현재 ETH/BTC가 200일 평균선 <b class="up">위</b>에 있습니다. 비트코인 → 이더리움 이동(2단계)이 힘을 받는 구간입니다.':'현재 ETH/BTC가 200일 평균선 <b class="dn">아래</b>에 있습니다. 이더리움으로의 이동이 아직 약합니다.'}</div></div>`;
+  }
+
+  // 조회 기록
+  const hist = lsGet(LS_HIST) || [];
+  let histHTML = '';
+  if(hist.length){
+    const hs = hist.slice(-60);
+    const lbl = hs.length>1 ? [[0, kst(hs[0].t).replace(/\s/g,' ')],[hs.length-1,'지금']] : [];
+    histHTML = `<div class="card chart"><h2>🕘 내 조회 기록 <span class="hint">이 기기에 저장</span></h2>
+      ${hs.length>1 ? lineChart({series:[{data:hs.map(h=>h.p), color:'#ffffff', w:2},{data:hs.map(h=>1+h.heat/100*3), color:'#ff4d5e', w:1.3, dash:'3 3', op:.8}], height:150, xLabels:lbl, yFmt:v=>v.toFixed(1)+'단'}) : '<div class="cap">조회할 때마다 위치가 쌓입니다. 다음에 열면 흐름이 선으로 보입니다.</div>'}
+      ${hs.length>1?'<div class="legend"><span><i style="background:#fff"></i>순환 위치(1~4)</span><span><i style="background:#ff4d5e"></i>순환 온도(같은 눈금으로 환산)</span></div>':''}
+      <div class="hist-list">${hist.slice(-5).reverse().map(h=>`<div><span class="mut">${kst(h.t)}</span><span><b style="color:${TIERS[h.st-1].hex}">${h.st}단계</b> · 위치 ${h.p.toFixed(2)} · 온도 ${h.heat}</span></div>`).join('')}</div></div>`;
+  }
+
+  $('#app').innerHTML = heroHTML + (E.memo||'') + ladderHTML + repHTML + gaugeHTML + (E.dd||'') + (E.kr||'') + (E.fu||'') + (E.st||'') + relHTML + htHTML + kpiHTML + ebHTML + histHTML;
+  requestAnimationFrame(placeHere);
+}
+function placeHere(){
+  const lad = $('#ladder'), here = $('#here'); if(!lad || !here || !window.__A) return;
+  const cards = [...lad.querySelectorAll('.tier')]; if(cards.length<4) return;
+  const c = cards.map(el => el.offsetTop + el.offsetHeight/2);
+  const p = clamp(window.__A.pos, 1, 4), i = Math.min(2, Math.floor(p-1)), f = (p-1) - i;
+  here.style.top = (c[i] + (c[i+1]-c[i])*f) + 'px';
+}
+window.addEventListener('resize', placeHere);
+
+function saveHist(A){
+  const h = lsGet(LS_HIST) || [];
+  const snap = {t:Date.now(), p:+A.pos.toFixed(3), st:A.stage, heat:A.heat, alt:A.alt30, dom:A.dom.btc!=null?+A.dom.btc.toFixed(2):null};
+  if(h.length && snap.t - h[h.length-1].t < 30*60*1000) h[h.length-1] = snap; else h.push(snap);
+  lsSet(LS_HIST, h.slice(-300));
+}
+function setStatus(D, X){
+  const L = D.live; const chips = [];
+  chips.push(`<span class="chip">기준 ${kst(D.t)} (한국시간)</span>`);
+  chips.push(L.markets ? '<span class="chip ok">● 실시간</span>' : '<span class="chip warn">● 저장된 데이터</span>');
+  if(!L.fng) chips.push('<span class="chip warn">공포탐욕 지연</span>');
+  if(!L.ethbtc) chips.push('<span class="chip warn">ETH/BTC 지연</span>');
+  if(X){ const XL = X.live||{}; [['upbit','업비트'],['stable','스테이블'],['fut','선물'],['fx','환율']].forEach(([k,n]) => { if(!XL[k]) chips.push(`<span class="chip warn">${n} ${X[k]?'저장본':'없음'}</span>`); }); }
+  $('#status').innerHTML = chips.join('');
+}
+
+let busy = false, lastLoad = 0;
+async function run(){
+  if(busy) return; busy = true; const b = $('#refresh'); b.classList.add('spin');
+  try{
+    const [D, X] = await Promise.all([loadAll(), loadExtras().catch(e => ({live:{}}))]);
+    const A = analyze(D); window.__A = A;
+    let R = null; try{ R = analyzeExtras(D, A, X); }catch(e){ console.error(e); }
+    if(D.live.markets) saveHist(A);
+    render(D, A, R); setStatus(D, X); lastLoad = Date.now();
+    if(!D.live.markets) toast('무료 API가 잠시 막혀 마지막 저장 데이터를 보여줍니다. 1~2분 뒤 다시 갱신해 보세요.');
+  }catch(e){
+    console.error(e);
+    if(!window.__A) $('#app').innerHTML = `<div class="card skel">데이터를 불러오지 못했습니다.<br><span style="font-size:12px">${esc(e.message)}</span><br><br>1~2분 뒤 ‘갱신’을 눌러 주세요.</div>`;
+    toast('불러오기 실패: '+e.message);
+  }finally{ busy = false; b.classList.remove('spin'); }
+}
+$('#refresh').addEventListener('click', () => {
+  if(Date.now()-lastLoad < 20000){ toast('무료 API 보호를 위해 20초 뒤에 다시 눌러 주세요.'); return; }
+  run();
+});
+document.addEventListener('visibilitychange', () => { if(document.visibilityState==='visible' && Date.now()-lastLoad > 5*60*1000) run(); });
+setInterval(() => { if(document.visibilityState==='visible') run(); }, 5*60*1000);
+run();
+if('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(()=>{}));
+</script>
+</body>
+</html>
